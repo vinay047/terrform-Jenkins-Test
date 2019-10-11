@@ -353,5 +353,3 @@ health_check {
     instance_protocol = "http"
   }
 }
-
-Sensitivity: Internal & Restricted
