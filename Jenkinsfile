@@ -11,15 +11,15 @@ pipeline {
           description: 'JUMP_SERVER_IP') 
  
           string(name: 'JENKINS_ACCESS_KEY_ID', 
-          defaultValue: 'AKIAXXFZRLIBQATYLW23', 
+          defaultValue: 'access_key', 
           description: 'JENKINS_ACCESS_KEY_ID') 
  
           password(name: 'JENKINS_SECRET_ACCESS_KEY', 
-          defaultValue: 'a+LcjRyFcOFs8f0/Thw8AtyIsAM3yZKFwJUEvii6', 
+          defaultValue: 'secret_key', 
           description: 'JENKINS_SECRET_ACCESS_KEY') 
  
           string(name: 'DEFAULT_REGION', 
-          defaultValue: 'us-east-1', 
+          defaultValue: 'deault_region', 
           description: 'DEFAULT_REGION') 
        } 
     
