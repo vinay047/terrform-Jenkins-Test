@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nodeappsk1
+  labels:
+    app: nodeappsk1
+spec:
+  containers:
+    - name: nodeappsk1
+      image: 530817571331.dkr.ecr.us-east-1.amazonaws.com/docker-image:vinaylatest
+      ports:
+        - containerPort: 8080
