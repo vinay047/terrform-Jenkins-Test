@@ -1,91 +1,77 @@
-// Jenkinsfile
-String credentialsId = 'awsCredentials'
-
-try {
-  stage('checkout') {
-    node {
-      cleanWs()
-      checkout scm
-    }
-  }
-
-  // Run terraform init
-  stage('init') {
-    node {
-      withCredentials([[
-        $class: 'AmazonWebServicesCredentialsBinding',
-        credentialsId: credentialsId,
-        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-      ]]) {
-        ansiColor('xterm') {
-          sh 'terraform init'
-        }
-      }
-    }
-  }
-
-  // Run terraform plan
-  stage('plan') {
-    node {
-      withCredentials([[
-        $class: 'AmazonWebServicesCredentialsBinding',
-        credentialsId: credentialsId,
-        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-      ]]) {
-        ansiColor('xterm') {
-          sh 'terraform plan'
-        }
-      }
-    }
-  }
-
-
-
-    // Run terraform apply
-    stage('apply') {
-      node {
-        withCredentials([[
-          $class: 'AmazonWebServicesCredentialsBinding',
-          credentialsId: credentialsId,
-          accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-          secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-        ]]) {
-          ansiColor('xterm') {
-            sh 'terraform apply -auto-approve'
-          }
-        }
-      }
+pipeline { 
+   agent any 
+ 
+   parameters{ 
+          string(name: 'ECS_CLUSTER_NAME', 
+          defaultValue: 'terraform-eks-demo', 
+          description: 'ECS_CLUSTER_NAME') 
+ 
+          string(name: 'JUMP_SERVER_IP', 
+          defaultValue: '52.23.168.124', 
+          description: 'JUMP_SERVER_IP') 
+ 
+          string(name: 'JENKINS_ACCESS_KEY_ID', 
+          defaultValue: 'AKIAXXFZRLIBQATYLW23', 
+          description: 'JENKINS_ACCESS_KEY_ID') 
+ 
+          password(name: 'JENKINS_SECRET_ACCESS_KEY', 
+          defaultValue: 'a+LcjRyFcOFs8f0/Thw8AtyIsAM3yZKFwJUEvii6', 
+          description: 'JENKINS_SECRET_ACCESS_KEY') 
+ 
+          string(name: 'DEFAULT_REGION', 
+          defaultValue: 'us-east-1', 
+          description: 'DEFAULT_REGION') 
+       } 
     
-
-    // Run terraform show
-    stage('show') {
-      node {
-        withCredentials([[
-          $class: 'AmazonWebServicesCredentialsBinding',
-          credentialsId: credentialsId,
-          accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-          secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-        ]]) {
-          ansiColor('xterm') {
-            sh 'terraform show'
-          }
-        }
-      }
-    }
-  }
-  currentBuild.result = 'SUCCESS'
-}
-catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException flowError) {
-  currentBuild.result = 'ABORTED'
-}
-catch (err) {
-  currentBuild.result = 'FAILURE'
-  throw err
-}
-finally {
-  if (currentBuild.result == 'SUCCESS') {
-    currentBuild.result = 'SUCCESS'
-  }
-}
+   stages { 
+ 
+    stage('Checkout') { 
+         steps { 
+        git 'https://git-codecommit.us-east-1.amazonaws.com/v1/repos/Agent_Landing_Portal' 
+ 
+        } 
+       } 
+ 
+      stage('Create and push image to ECR') { 
+ 
+ 
+         steps { 
+            sh 'aws configure set aws_access_key_id ${JENKINS_ACCESS_KEY_ID}' 
+            sh 'aws configure set aws_secret_access_key ${JENKINS_SECRET_ACCESS_KEY}' 
+            sh 'aws configure set default.region ${DEFAULT_REGION}' 
+            sh 'sudo `aws ecr get-login --no-include-email`' 
+            sh 'sudo docker build -t 530817571331.dkr.ecr.us-east-1.amazonaws.com/docker-image:vinaylatest .' 
+            sh 'sudo docker push 530817571331.dkr.ecr.us-east-1.amazonaws.com/docker-image:vinaylatest' 
+ 
+         } 
+ 
+      } 
+ 
+      stage('Deploy to K8s') { 
+ 
+                       steps { 
+ 
+                          sshagent(['jenkins']){ 
+                            sh "scp -o StrictHostKeyChecking=no pods.yml services.yml  ec2-user@${JUMP_SERVER_IP}:/home/ec2-user/" 
+                            script { 
+                                try{ 
+                                sh 'rm -rf  ~/.aws/credentials' 
+                                sh 'rm -rf  ~/.aws/config' 
+                                sh 'aws configure set aws_access_key_id ${JENKINS_ACCESS_KEY_ID}' 
+                                sh 'aws configure set aws_secret_access_key ${JENKINS_SECRET_ACCESS_KEY}' 
+                                sh 'aws configure set default.region ${DEFAULT_REGION}' 
+                                sh 'ssh ec2-user@${JUMP_SERVER_IP} aws eks --region us-east-1 update-kubeconfig --name ${ECS_CLUSTER_NAME}' 
+                                sh 'ssh ec2-user@${JUMP_SERVER_IP} ls -latr' 
+                                sh 'ssh ec2-user@${JUMP_SERVER_IP} kubectl apply -f .' 
+                                }catch(error){ 
+                                    sh 'ssh ec2-user@${JUMP_SERVER_IP} kubectl create -f .' 
+                                } 
+                            } 
+                          } 
+ 
+                       } 
+            } 
+ 
+  } 
+ 
+} 
